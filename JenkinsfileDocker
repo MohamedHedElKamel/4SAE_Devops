@@ -1,13 +1,41 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "hedi7/alpine"
+        IMAGE_TAG  = "1.0.0"
+        DOCKERFILE_PATH = "/var/lib/jenkins/docker/Dockerfile"
+        CONTEXT_PATH = "/var/lib/jenkins/docker"
+    }
+
     stages {
-        stage('Stage 1 - Docker build') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t hedi7/alpine:1.0.0 ."
+                    sh "docker build -f $DOCKERFILE_PATH -t $IMAGE_NAME:$IMAGE_TAG $CONTEXT_PATH"
                 }
             }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh """
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+                        docker push $IMAGE_NAME:$IMAGE_TAG
+                        docker logout
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Docker image $IMAGE_NAME:$IMAGE_TAG successfully built and pushed!"
+        }
+        failure {
+            echo "Build or push failed!"
         }
     }
 }
